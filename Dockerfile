@@ -1,48 +1,27 @@
-FROM python:3.11-slim
+FROM python:3.12-slim-bookworm
 
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
+
+# Download and install uv
+ADD https://astral.sh/uv/install.sh /uv-installer.sh
+RUN sh /uv-installer.sh && rm /uv-installer.sh
+
+# Install FastAPI and Uvicorn
+RUN pip install fastapi uvicorn
+
+# Ensure the installed binary is on the `PATH`
+ENV PATH="/root/.local/bin:$PATH"
+
+# Set up the application directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    nodejs \
-    npm \
-    git \
-    ffmpeg \
-    libsm6 \
-    libxext6 \
-    curl \
-    build-essential \
-    pkg-config \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /data
 
-# Verify npm and npx installation
-RUN npm -v && npx -v
+# Copy application files
+COPY app.py /app
+COPY tasksA.py /app
+COPY tasksB.py /app
 
-# Install prettier and markdown plugins globally
-RUN npm install -g prettier@3.4.2 @prettier/plugin-markdown
-
-# Copy requirements first to leverage Docker cache
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install UV
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-# Copy application code
-COPY . .
-
-# Create data directory with proper permissions
-RUN mkdir -p /data && chmod 755 /data
-
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV AIPROXY_TOKEN=${AIPROXY_TOKEN}
-ENV PYTHONPATH=/app
-
-# Expose port
-EXPOSE 8000
-
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Explicitly set the correct binary path and use `sh -c`
+CMD ["/root/.local/bin/uv", "run", "app.py"]
